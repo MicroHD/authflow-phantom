@@ -1,4 +1,4 @@
-# @authflow/phantom
+# @auth-flow/phantom
 
 [![npm version](https://badge.fury.io/js/%40authflow%2Fphantom.svg)](https://badge.fury.io/js/%40authflow%2Fphantom)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -27,13 +27,13 @@ A secure, passwordless authentication library for NestJS applications. Built wit
 
 ```bash
 # Using bun (recommended)
-bun add @authflow/phantom
+bun add @auth-flow/phantom
 
 # Using npm
-npm install @authflow/phantom
+npm install @auth-flow/phantom
 
 # Using yarn
-yarn add @authflow/phantom
+yarn add @auth-flow/phantom
 ```
 
 ## 🚀 Quick Start
