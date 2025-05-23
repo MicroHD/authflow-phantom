@@ -25,7 +25,9 @@ export class ErrorInterceptor implements NestInterceptor {
         }
 
         // Handle unknown errors
-        console.error('Unhandled error:', error);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Unhandled error:', error);
+        }
         throw new HttpException(
           {
             statusCode: HttpStatus.INTERNAL_SERVER_ERROR,

@@ -41,6 +41,7 @@ describe('ErrorInterceptor', () => {
           statusCode: 400,
           error: 'AUTH_FLOW_ERROR',
           message: 'Test error',
+          details: undefined,
         });
         done();
       },

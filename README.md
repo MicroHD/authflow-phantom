@@ -36,73 +36,114 @@ npm install @auth-flow/phantom
 yarn add @auth-flow/phantom
 ```
 
-## 🚀 Quick Start
+## 🔑 Getting Started
 
-1. **Install Dependencies**
+1. **Generate API Key**
+
+You can generate your API key in two ways:
 
 ```bash
-bun add @authflow/phantom @nestjs/common @nestjs/core
+# Method 1: Using the CLI tool
+bunx @auth-flow/phantom
+# or
+npx @auth-flow/phantom
+
+# Method 2: Programmatically
+import { ApiKeyService } from '@auth-flow/phantom';
+
+const apiKeyService = new ApiKeyService();
+const { apiKey, projectId } = apiKeyService.generateApiKey();
 ```
 
-2. **Environment Setup**
-
-Create a `.env` file in your project root:
+This will generate your API key and Project ID. Add them to your `.env` file:
 
 ```env
-# JWT Configuration
-JWT_SECRET=your-secret-key-here
-SESSION_EXPIRY_DAYS=7
+AUTHFLOW_API_KEY=your_api_key_here
+AUTHFLOW_PROJECT_ID=your_project_id_here
+```
+
+2. **Install Dependencies**
+
+```bash
+bun add @auth-flow/phantom @nestjs/common @nestjs/core
+```
+
+3. **Environment Setup**
+
+Add these to your `.env` file:
+
+```env
+# Database Configuration
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 
 # Redis Configuration
-REDIS_URL=redis://localhost:6379
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your-redis-password
 
 # Email Configuration
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
-SMTP_SECURE=false
 SMTP_USER=your-smtp-user
 SMTP_PASS=your-smtp-password
 SMTP_FROM=noreply@example.com
 
-# WebAuthn Configuration
-WEBAUTHN_RP_ID=localhost
-WEBAUTHN_ORIGIN=https://localhost
+# JWT Configuration
+JWT_SECRET=your-secret-key-here
 
-# Application Configuration
-APP_NAME=Your App Name
-APP_URL=https://localhost
-
-# Security Configuration
-ENCRYPTION_KEY=your-32-byte-encryption-key-here
-PHANTOM_LINK_EXPIRY=300
-DEVICE_TOKEN_EXPIRY_DAYS=30
+# WebAuthn Configuration (Optional)
+WEBAUTHN_RP_NAME=Your App Name
+WEBAUTHN_RP_ID=yourdomain.com
+WEBAUTHN_ORIGIN=https://yourdomain.com
 ```
 
-3. **Module Integration**
+4. **Module Integration**
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { AuthFlowModule } from '@authflow/phantom';
+import { AuthFlowModule } from '@auth-flow/phantom';
 
 @Module({
   imports: [
     AuthFlowModule.forRoot({
-      // Optional configuration
-      rateLimit: {
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 5 // limit each IP to 5 requests per windowMs
-      }
-    })
+      database: {
+        url: process.env.DATABASE_URL,
+      },
+      redis: {
+        host: process.env.REDIS_HOST,
+        port: parseInt(process.env.REDIS_PORT),
+        password: process.env.REDIS_PASSWORD,
+      },
+      email: {
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT),
+        secure: true,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+        from: process.env.SMTP_FROM,
+      },
+      jwt: {
+        secret: process.env.JWT_SECRET,
+        expiresIn: '7d',
+      },
+      webauthn: {
+        rpName: process.env.WEBAUTHN_RP_NAME,
+        rpID: process.env.WEBAUTHN_RP_ID,
+        origin: process.env.WEBAUTHN_ORIGIN,
+      },
+    }),
   ],
 })
 export class AppModule {}
 ```
 
-4. **Controller Implementation**
+5. **Controller Implementation**
 
 ```typescript
 import { Controller, Post, Body, Req, UseGuards } from '@nestjs/common';
-import { AuthFlowService, AuthGuard, ContextEngine } from '@authflow/phantom';
+import { AuthFlowService, AuthGuard } from '@auth-flow/phantom';
 import { Request } from 'express';
 
 @Controller('auth')
@@ -110,16 +151,14 @@ export class AuthController {
   constructor(private readonly authFlow: AuthFlowService) {}
 
   @Post('login')
-  async login(@Body('email') email: string, @Req() req: Request) {
-    const context = ContextEngine.getRequestContext(req);
-    await this.authFlow.initiateLogin(email, context);
+  async login(@Body('email') email: string) {
+    await this.authFlow.sendMagicLink(email);
     return { message: 'Login link sent' };
   }
 
   @Post('verify')
-  async verify(@Body('token') token: string, @Req() req: Request) {
-    const context = ContextEngine.getRequestContext(req);
-    const result = await this.authFlow.validateLogin(token, context);
+  async verify(@Body('token') token: string) {
+    const result = await this.authFlow.validateLogin(token);
     return result;
   }
 
@@ -133,29 +172,205 @@ export class AuthController {
 
 ## 🔧 Configuration Options
 
-### AuthFlowModule Options
+### AuthFlowModule Configuration
 
 ```typescript
-interface AuthFlowModuleOptions {
-  rateLimit?: {
-    windowMs: number;
-    max: number;
-  };
-  redis?: {
+interface AuthFlowConfig {
+  database: {
     url: string;
-    ttl: number;
   };
-  jwt?: {
+  redis: {
+    host: string;
+    port: number;
+    password?: string;
+  };
+  email: {
+    host: string;
+    port: number;
+    secure: boolean;
+    auth: {
+      user: string;
+      pass: string;
+    };
+    from: string;
+  };
+  jwt: {
     secret: string;
     expiresIn: string;
   };
-  email?: {
-    from: string;
-    subject: string;
-    template: string;
+  webauthn?: {
+    rpName: string;
+    rpID: string;
+    origin: string;
   };
 }
 ```
+
+### Using Custom Redis Configuration
+
+You can use your own Redis configuration in three ways:
+1. **Using the built-in SharedModule (default)**:
+```typescript
+@Module({
+  imports: [
+    AuthFlowModule.forRoot({
+      // ... other config
+      redis: {
+        host: 'localhost',
+        port: 6379,
+        password: 'your-password'
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+2. **Using your own Redis module**:
+```typescript
+@Module({
+  imports: [
+    AuthFlowModule.forRoot({
+      // ... other config
+      redis: {
+        host: 'localhost',
+        port: 6379,
+        password: 'your-password'
+      },
+    }, {
+      useCustomRedis: true,
+      customRedisModule: YourRedisModule, // Your custom Redis module
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+3. **Providing RedisService globally**:
+```typescript
+@Module({
+  imports: [
+    AuthFlowModule.forRoot({
+      // ... other config
+      redis: {
+        host: 'localhost',
+        port: 6379,
+        password: 'your-password'
+      },
+    }, { useCustomRedis: true }), // No custom module provided, app must provide RedisService
+  ],
+})
+export class AppModule {}
+```
+
+Note: When using a custom Redis module or providing RedisService globally, make sure it implements the same interface as the built-in RedisService. The RedisService should provide these methods:
+- `get<T>(key: string): Promise<T | null>`
+- `set(key: string, value: any, ttl?: number): Promise<void>`
+- `del(key: string): Promise<void>`
+- `setWithExpiry(key: string, value: any, ttl: number): Promise<void>`
+
+### Using Custom Redis and Prisma Configuration
+
+You can use your own Redis and Prisma configuration in several ways:
+
+1. **Using the built-in SharedModule (default)**:
+```typescript
+@Module({
+  imports: [
+    AuthFlowModule.forRoot({
+      // ... other config
+      redis: {
+        host: 'localhost',
+        port: 6379,
+        password: 'your-password'
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+2. **Using custom Redis and Prisma modules**:
+```typescript
+@Module({
+  imports: [
+    AuthFlowModule.forRoot({
+      // ... other config
+      redis: {
+        host: 'localhost',
+        port: 6379,
+        password: 'your-password'
+      },
+    }, {
+      useCustomRedis: true,
+      customRedisModule: YourRedisModule,
+      useCustomPrisma: true,
+      customPrismaModule: YourPrismaModule,
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+3. **Providing PrismaService globally**:
+```typescript
+// In your app's PrismaModule:
+@Module({
+  providers: [YourPrismaService],
+  exports: [YourPrismaService],
+})
+export class PrismaModule {}
+
+// In your AppModule:
+@Module({
+  imports: [
+    PrismaModule, // Import your PrismaModule first
+    AuthFlowModule.forRoot({
+      // ... other config
+      redis: {
+        host: 'localhost',
+        port: 6379,
+        password: 'your-password'
+      },
+    }, {
+      useCustomPrisma: true, // No custom module provided, app must provide PrismaService
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Note: When using custom modules or providing services globally, make sure they implement the correct interfaces:
+
+**RedisService Interface:**
+```typescript
+interface RedisService {
+  get<T>(key: string): Promise<T | null>;
+  set(key: string, value: any, ttl?: number): Promise<void>;
+  del(key: string): Promise<void>;
+  setWithExpiry(key: string, value: any, ttl: number): Promise<void>;
+}
+```
+
+**PrismaService Interface:**
+```typescript
+interface PrismaService {
+  // Your Prisma client methods
+  user: {
+    findUnique: (args: any) => Promise<any>;
+    create: (args: any) => Promise<any>;
+    update: (args: any) => Promise<any>;
+    delete: (args: any) => Promise<any>;
+  };
+  // ... other Prisma models
+}
+```
+
+**Important**: When providing your own PrismaService:
+1. Make sure your PrismaService class implements all required methods
+2. Export your PrismaService from your module
+3. Import your PrismaModule before AuthFlowModule in your app
+4. If using a custom module, pass it through the `customPrismaModule` option
 
 ## 🔐 Security Best Practices
 
@@ -200,8 +415,8 @@ bun test:watch
 
 ```typescript
 class AuthFlowService {
-  initiateLogin(email: string, context: RequestContext): Promise<void>;
-  validateLogin(token: string, context: RequestContext): Promise<AuthResult>;
+  sendMagicLink(email: string): Promise<void>;
+  validateLogin(token: string): Promise<AuthResult>;
   refreshToken(token: string): Promise<AuthResult>;
   logout(token: string): Promise<void>;
 }

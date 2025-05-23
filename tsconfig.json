@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "ESNext",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -24,12 +24,10 @@
     "noImplicitThis": true,
     "strictFunctionTypes": true,
     "strictPropertyInitialization": true,
+    "moduleResolution": "node",
     "types": ["jest", "node"],
-    "paths": {
-      "@authflow/phantom": ["src"],
-      "@authflow/phantom/*": ["src/*"]
-    }
+    "rootDir": "src"
   },
-  "include": ["src/**/*", "test/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 } 
