@@ -46,7 +46,6 @@ export class PhantomLinkService {
       // Generate JWT with additional security claims
       const token = sign(payload, this.secret, {
         algorithm: 'HS256',
-        jwtid: jti,
         noTimestamp: false,
       });
 
